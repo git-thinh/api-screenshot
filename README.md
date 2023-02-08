@@ -2,6 +2,7 @@
 
 # Screenshot API
 
+- yarn global add netlify-cli
 A runtime service to use live website screenshots on your site.
 
 Read the [Blog post: Building an Automated Screenshot Service on Netlify in ~140 Lines of Code](https://www.zachleat.com/web/screenshots/).
