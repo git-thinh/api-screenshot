@@ -21,8 +21,6 @@ async function screenshot(url, {
 	wait,
 	timeout = 8500
 }) {
-	// Must be between 3000 and 8500
-	timeout = Math.min(Math.max(timeout, 3000), 8500);
 
 	const browser = await chromium.puppeteer.launch({
 		executablePath: await chromium.executablePath,
@@ -41,6 +39,8 @@ async function screenshot(url, {
 		page.setJavaScriptEnabled(false);
 	}
 
+	// Must be between 3000 and 8500
+	timeout = Math.min(Math.max(timeout, 3000), 8500);
 	let response = await Promise.race([
 		page.goto(url, {
 			waitUntil: wait || ["load"],
@@ -53,7 +53,6 @@ async function screenshot(url, {
 				1500); // we need time to execute the window.stop before the top level timeout hits
 		}),
 	]);
-
 	if (response === false) { // timed out, resolved false
 		await page.evaluate(() => window.stop());
 	}
@@ -89,7 +88,7 @@ async function screenshot(url, {
 async function handler(event, context) {
 	// e.g. /https%3A%2F%2Fwww.11ty.dev%2F/small/1:1/smaller/
 	let pathSplit = event.path.split("/").filter(entry => !!entry);
-	let [url, size, aspectratio, zoom, cachebuster] = pathSplit;
+	let [dirPath, url, size, aspectratio, zoom, cachebuster] = pathSplit;
 	let format = "jpeg"; // hardcoded for now, but png and webp are supported!
 	let viewport = [];
 

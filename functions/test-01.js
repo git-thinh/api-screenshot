@@ -3,6 +3,20 @@ const {
 } = require("@netlify/functions");
 const chromium = require("chrome-aws-lambda");
 
+async function getOptions(viewport, dpr) {
+	return {
+		executablePath: await chromium.executablePath,
+		args: chromium.args,
+		defaultViewport: {
+			width: viewport[0],
+			height: viewport[1],
+			deviceScaleFactor: parseFloat(dpr),
+		},
+		headless: chromium.headless,
+	}
+}
+
+
 function isFullUrl(url) {
 	try {
 		new URL(url);
@@ -15,7 +29,7 @@ function isFullUrl(url) {
 
 async function handler(event, context) {
 	let pathSplit = event.path.split("/").filter(entry => !!entry);
-	let [url] = pathSplit;
+	let [temp, url] = pathSplit;
 
 	url = decodeURIComponent(url).trim();
 	if (url === 'favicon.ico')
@@ -25,9 +39,8 @@ async function handler(event, context) {
 	if (url.length > 0 && url[0] === '_') url = 'http://' + url;
 	else if (url.length > 0) url = 'https://' + url;
 
-
 	let error_message = '';
-	console.log('url = ', url);
+	console.log('\t URL = ', url);
 
 	try {
 		let valid = true;
@@ -37,30 +50,71 @@ async function handler(event, context) {
 		}
 
 		if (valid) {
-			let result = null;
-			let browser = null;
-			
-			browser = await chromium.puppeteer.launch({
-				args: chromium.args,
-				defaultViewport: chromium.defaultViewport,
-				executablePath: await chromium.executablePath,
-				headless: chromium.headless,
-				ignoreHTTPSErrors: true,
-			});
+			let format = "jpeg";
+			let viewport = [375, 375];
+			let dpr = 1;
+			let timeout = 8500; // Must be between 3000 and 8500
+			let wait = ["load"];
+
+			const option = await getOptions(viewport, dpr);
+			let browser = await chromium.puppeteer.launch(option);
 			let page = await browser.newPage();
-			await page.goto(url);
 
-			result = await page.title();
+			//------------------------------------------------------------
+
+			//await page.goto(url);
+
+			timeout = Math.min(Math.max(timeout, 3000), 8500);
+			let response = await Promise.race([
+				page.goto(url, {
+					waitUntil: wait || ["load"],
+					timeout,
+				}),
+				new Promise(resolve => {
+					setTimeout(() => {
+							resolve(false); // false is expected below
+						}, timeout -
+						1500
+					); // we need time to execute the window.stop before the top level timeout hits
+				}),
+			]);
+			if (response === false) { // timed out, resolved false
+				await page.evaluate(() => window.stop());
+			}
+
+			//result = await page.title();
+			// let statusCode = response.status();
+			// TODO handle 4xx/5xx status codes better
+
+			//------------------------------------------------------------
+
+			let options = {
+				type: format,
+				encoding: "base64",
+				fullPage: false,
+				captureBeyondViewport: false,
+				clip: {
+					x: 0,
+					y: 0,
+					width: viewport[0],
+					height: viewport[1],
+				}
+			};
+			if (format === "jpeg") options.quality = 80;
+			let output = await page.screenshot(options);
+			await browser.close();
+
+			//------------------------------------------------------------
+
+			return {
+				statusCode: 200,
+				headers: {
+					"content-type": `image/${format}`
+				},
+				body: output,
+				isBase64Encoded: true
+			};
 		}
-
-		return {
-			statusCode: 200,
-			headers: {
-				"content-type": `image/png`
-			},
-			body: output,
-			isBase64Encoded: true
-		};
 	} catch (error) {
 		console.log("ERROR_EXCEPTION = ", error);
 		error_message = error.message;

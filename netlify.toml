@@ -9,14 +9,14 @@
     functionsPort = 52041
 	
 [[redirects]]
-	from = "/ss/*"
-	to = "/.netlify/builders/screenshot"
+	from = "/test-00/*"
+	to = "/.netlify/builders/test-00"
 	status = 200
 	force = true
 	
 [[redirects]]
-	from = "/ct/*"
-	to = "/.netlify/builders/capture"
+	from = "/test-01/*"
+	to = "/.netlify/builders/test-01"
 	status = 200
 	force = true
 
